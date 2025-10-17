@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Theseus H2 — Restoration Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0b0f14;--card:#121822;--muted:#7a8aa0;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--fg:#e5eef8;--accent:#60a5fa}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b0f14,#0f1722);
+  color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",sans-serif}
+  .wrap{max-width:1100px;margin:40px auto;padding:0 16px}
+  .head{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .badge{padding:6px 10px;border-radius:999px;font-weight:700;letter-spacing:.4px}
+  .pass{background:rgba(16,185,129,.15);color:var(--ok);border:1px solid rgba(16,185,129,.35)}
+  .fail{background:rgba(239,68,68,.15);color:var(--bad);border:1px solid rgba(239,68,68,.35)}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .card{grid-column:span 6;background:var(--card);border:1px solid rgba(96,165,250,.12);border-radius:16px;padding:16px;box-shadow:0 6px 30px rgba(0,0,0,.25)}
+  .card.small{grid-column:span 4}
+  .title{font-weight:800;margin:0 0 4px}
+  .muted{color:var(--muted);font-size:13px;margin:0 0 10px}
+  .drop{border:2px dashed rgba(96,165,250,.35);border-radius:14px;padding:18px;text-align:center;color:var(--muted);margin:8px 0 18px}
+  .kv{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .kv div{background:#0c131d;border:1px dashed rgba(96,165,250,.18);padding:8px 12px;border-radius:10px;font-size:13px}
+  canvas{max-height:260px}
+  .pill{padding:2px 8px;border-radius:8px;font-weight:700}
+  .ok{color:var(--ok);border:1px solid rgba(16,185,129,.4)}
+  .bad{color:var(--bad);border:1px solid rgba(239,68,68,.4)}
+  .warn{color:var(--warn);border:1px solid rgba(245,158,11,.4)}
+  .footer{color:var(--muted);font-size:12px;margin-top:16px}
+  .cta{background:var(--accent);color:#06101c;border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <h1 style="margin:0">Theseus H2 — Restoration Dashboard</h1>
+        <p class="muted" id="meta">Drop a <code>restoration_report.json</code> to visualize thresholds & gates.</p>
+      </div>
+      <div id="verdict" class="badge">Waiting for report…</div>
+    </div>
+
+    <div id="drop" class="drop">Drag & drop <code>restoration_report.json</code> here, or <label style="color:var(--accent);cursor:pointer;"><input id="file" type="file" accept="application/json" style="display:none;">browse</label></div>
+
+    <div class="grid">
+      <div class="card">
+        <h3 class="title">Performance (Perf)</h3>
+        <p class="muted">S must be ≥ Θ<sub>Y</sub> (α × median(B))</p>
+        <div class="kv" id="perfKV"></div>
+        <canvas id="perfChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3 class="title">Specificity (Spec)</h3>
+        <p class="muted">On-target must beat controls; DID ≥ δ; controls &lt; Θ<sub>Y</sub></p>
+        <div class="kv" id="specKV"></div>
+        <canvas id="specChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3 class="title">Timing (Time)</h3>
+        <p class="muted">|ΔLatency| ≤ bound; dispersion ≤ bound</p>
+        <div class="kv" id="timeKV"></div>
+        <canvas id="timeChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3 class="title">Safety (Safe)</h3>
+        <p class="muted">Budget within limits; no upward drift</p>
+        <div class="kv" id="safeKV"></div>
+        <canvas id="safeChart"></canvas>
+      </div>
+
+      <div class="card small">
+        <h3 class="title">Composite</h3>
+        <p class="muted">All four gates must PASS</p>
+        <div id="compositeKV" class="kv"></div>
+        <button class="cta" id="exportBtn">Export summary (.txt)</button>
+        <div class="footer" id="summary"></div>
+      </div>
+
+      <div class="card small">
+        <h3 class="title">Thresholds</h3>
+        <p class="muted" id="thresh"></p>
+        <div class="footer">Change thresholds in your bundle’s <code>meta.json</code> and re-run H2.</div>
+      </div>
+
+      <div class="card small">
+        <h3 class="title">Provenance</h3>
+        <div class="kv" id="prov"></div>
+      </div>
+
+      <div class="card small">
+        <h3 class="title">Tips</h3>
+        <ul class="muted" style="margin-top:6px">
+          <li>If Specificity fails, improve control slices (Track B).</li>
+          <li>If Timing fails, loosen dispersion bound or switch to MAD.</li>
+          <li>Regenerate report after changes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+const el = id => document.getElementById(id);
+let charts = [];
+
+function pill(ok, label){ return `<span class="pill ${ok?'ok':(label==='WARN'?'warn':'bad')}">${label}</span>` }
+
+function setVerdict(pass, score){
+  const v = el('verdict');
+  v.className = 'badge ' + (pass? 'pass' : 'fail');
+  v.textContent = (pass? 'PASS' : 'FAIL') + ` (score=${score})`;
+}
+
+function kv(parentId, entries){
+  const p = el(parentId); p.innerHTML = '';
+  entries.forEach(([k,v,ok])=>{
+    const span = typeof ok==='boolean' ? (ok ? pill(true,'OK') : pill(false,'FAIL')) : '';
+    p.insertAdjacentHTML('beforeend', `<div><b>${k}:</b> ${v} ${span}</div>`);
+  });
+}
+
+function bar(ctx, labels, data, colors){
+  return new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets:[{label:'', data, backgroundColor:colors}]},
+    options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+}
+
+function gauge(ctx, value, max=100){
+  return new Chart(ctx, {
+    type:'doughnut',
+    data:{labels:['Score',''], datasets:[{data:[value, Math.max(0, max-value)], backgroundColor:['#60a5fa33','#1f2937'], borderWidth:0, cutout:'72%'}]},
+    options:{plugins:{legend:{display:false}}, rotation:-90, circumference:180}
+  });
+}
+
+function render(report){
+  // headline
+  setVerdict(report.composite_pass, report.score);
+  el('meta').textContent = `Subject set: ${report.subject_set}`;
+  el('thresh').textContent = `α=${report.thresholds.alpha} · latency ≤ ${report.thresholds.latency_ms} ms · dispersion ≤ ${report.thresholds.dispersion_ratio}× · δ≥${report.thresholds.delta_min}`;
+
+  // PERF
+  kv('perfKV', [
+    ['median(B)', report.perf.baseline_median.toFixed(3)],
+    ['ΘY', report.perf.theta_y.toFixed(3)],
+    ['S', report.perf.S.toFixed(3), report.perf.pass]
+  ]);
+  charts.push(bar(el('perfChart'), ['ΘY','S'], [report.perf.theta_y, report.perf.S], ['#f59e0b','#10b981']));
+
+  // SPEC
+  kv('specKV', [
+    ['DID', report.specificity.did.toFixed(3), report.specificity.pass],
+    ['Controls < ΘY', report.specificity.controls_below_theta ? 'Yes' : 'No', report.specificity.controls_below_theta]
+  ]);
+  charts.push(bar(el('specChart'), ['DID (δ min)','DID'], [report.thresholds.delta_min, report.specificity.did], ['#f59e0b','#10b981']));
+
+  // TIME
+  const withinLat = Math.abs(report.timing.delta_latency_ms) <= report.thresholds.latency_ms;
+  const withinDisp = report.timing.dispersion_ratio <= report.thresholds.dispersion_ratio;
+  kv('timeKV', [
+    ['|ΔLatency| (ms)', report.timing.delta_latency_ms.toFixed(2), withinLat],
+    ['Dispersion ratio', report.timing.dispersion_ratio.toFixed(2), withinDisp]
+  ]);
+  charts.push(bar(el('timeChart'), ['Latency bound','|ΔLatency|','Disp bound','Dispersion'], [report.thresholds.latency_ms, Math.abs(report.timing.delta_latency_ms), report.thresholds.dispersion_ratio, report.timing.dispersion_ratio], ['#f59e0b','#10b981','#f59e0b','#10b981']));
+
+  // SAFETY
+  const withinBudget = (report.safety.budget_used_pct <= 100);
+  const trendOk = (report.safety.trend_beta <= 0);
+  kv('safeKV', [
+    ['Budget used (%)', report.safety.budget_used_pct, withinBudget],
+    ['Trend β ≤ 0', report.safety.trend_beta, trendOk]
+  ]);
+  charts.push(gauge(el('safeChart'), Math.min(100, report.safety.budget_used_pct)));
+
+  // Composite + provenance
+  kv('compositeKV', [
+    ['Perf', report.perf.pass ? 'PASS' : 'FAIL', report.perf.pass],
+    ['Spec', report.specificity.pass ? 'PASS' : 'FAIL', report.specificity.pass],
+    ['Time', report.timing.pass ? 'PASS' : 'FAIL', report.timing.pass],
+    ['Safe', report.safety.pass ? 'PASS' : 'FAIL', report.safety.pass]
+  ]);
+  const pr = report.provenance || {};
+  kv('prov', [
+    ['code_hash', pr.code_hash || '—'],
+    ['h2_version', pr.h2_version || '—'],
+    ['timestamp', (report.audit||{}).timestamp || '—']
+  ]);
+
+  el('summary').textContent = 'Drag in another report to compare. Tip: tune thresholds in meta.json and re-run H2.';
+}
+
+function clearCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
+
+function handleJSON(text){
+  try{
+    const report = JSON.parse(text);
+    clearCharts(); render(report);
+  }catch(e){ alert('Invalid JSON'); }
+}
+
+// drag & drop
+['dragenter','dragover','dragleave','drop'].forEach(evt=>el('drop').addEventListener(evt, e=>{e.preventDefault();e.stopPropagation();}));
+el('drop').addEventListener('drop', e=>{
+  const f = e.dataTransfer.files[0];
+  const reader = new FileReader();
+  reader.onload = () => handleJSON(reader.result);
+  reader.readAsText(f);
+});
+el('file').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload=()=>handleJSON(r.result); r.readAsText(f);
+});
+el('exportBtn').addEventListener('click', ()=>{
+  const t = el('verdict').textContent + '\n' + el('summary').textContent;
+  const blob = new Blob([t], {type:'text/plain'}); const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'restoration_summary.txt'; a.click();
+});
+</script>
+</body>
+</html>
