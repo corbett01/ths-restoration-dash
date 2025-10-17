@@ -222,6 +222,18 @@ el('exportBtn').addEventListener('click', ()=>{
   const blob = new Blob([t], {type:'text/plain'}); const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'restoration_summary.txt'; a.click();
 });
+// Load demo sample from the same repo (sample/restoration_report.json)
+el('demoBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('sample/restoration_report.json', {cache: 'no-store'});
+    if (!res.ok) throw new Error('Network error');
+    const text = await res.text();
+    handleJSON(text);
+  } catch (err) {
+    alert('Could not load demo report. Make sure sample/restoration_report.json exists in your repo.');
+  }
+});
+
 </script>
 </body>
 </html>
