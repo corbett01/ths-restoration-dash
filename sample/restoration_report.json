@@ -1,0 +1,40 @@
+{
+  "subject_set": "ibl_ba892860-149e-4bff-9961-aa6583d96661",
+  "provenance": {
+    "code_hash": "sha256:7cd65f70a423d422",
+    "h2_version": "0.1.0"
+  },
+  "thresholds": {
+    "alpha": 0.8,
+    "latency_ms": 50.0,
+    "dispersion_ratio": 1.25,
+    "delta_min": 0.15
+  },
+  "perf": {
+    "baseline_median": 1.0,
+    "theta_y": 0.8,
+    "S": 1.0,
+    "pass": true
+  },
+  "specificity": {
+    "did": 0.0,
+    "controls_below_theta": false,
+    "pass": false
+  },
+  "timing": {
+    "delta_latency_ms": 1.7099999999999795,
+    "dispersion_ratio": 11.22035831115878,
+    "pass": false
+  },
+  "safety": {
+    "budget_used_pct": 44,
+    "trend_beta": -0.003,
+    "pass": true
+  },
+  "composite_pass": false,
+  "score": 50,
+  "audit": {
+    "timestamp": "2025-10-17T21:12:06.419297Z",
+    "operator": "theseus"
+  }
+}
